@@ -1,7 +1,8 @@
 locals {
   tables             = { for table in var.tables : table["table_id"] => table }
   views              = { for view in var.views : view["view_id"] => view }
-  materialized_views = { for mat_view in var.materialized_views : mat_view["view_id"] => mat_view }
+  # materialized_views = { for mat_view in var.materialized_views : mat_view["view_id"] => mat_view }
+
 
   iam_to_primitive = {
     "roles/bigquery.dataOwner" : "OWNER"
@@ -21,25 +22,14 @@ resource "google_bigquery_dataset" "dataset" {
   default_table_expiration_ms     = var.default_table_expiration_ms
   default_partition_expiration_ms = var.default_partition_expiration_ms
   default_encryption_configuration {
-   kms_key_name = var.kms_key_name
-   }
-}
-
-resource "google_bigquery_dataset_access" "access" {
-
-  dataset_id = var.dataset_id
-  project    = var.project_id
-
-  view {
-    dataset_id = var.dataset_id
-    project_id = var.project_id
-    table_id   = var.table_id
+    kms_key_name = var.kms_key_name
   }
-  depends_on = [ google_bigquery_dataset.dataset ]
 }
+
+
 
 resource "google_bigquery_table" "materialized_view" {
-  for_each            = local.materialized_views
+  for_each            = local.tables
   dataset_id          = google_bigquery_dataset.dataset.dataset_id
   friendly_name       = each.key
   table_id            = each.key
@@ -71,16 +61,16 @@ resource "google_bigquery_table" "materialized_view" {
       }
     }
   }
+  #   materialized_view {
+  #   query               = each.value["query"]
+  #   enable_refresh      = each.value["enable_refresh"]
+  #   refresh_interval_ms = each.value["refresh_interval_ms"]
+  # }
 
-  materialized_view {
-    query               = each.value["query"]
-    enable_refresh      = each.value["enable_refresh"]
-    refresh_interval_ms = each.value["refresh_interval_ms"]
-  }
 
   lifecycle {
     ignore_changes = [
-      encryption_configuration # managed by google_bigquery_dataset.main.default_encryption_configuration
+      encryption_configuration, labels # managed by google_bigquery_dataset.main.default_encryption_configuration
     ]
   }
 }
